@@ -782,15 +782,53 @@ body.home nav.narrow {
   text-decoration: none;
 }
 
-/* Original link (e.g., Telegram) */
-.original-link {
-  display: inline-block;
+/* Reply-to link for Telegram posts */
+.reply-to {
   font-size: var(--font-small);
-  color: var(--accent-color);
-  text-decoration: none;
   margin-bottom: 1rem;
 }
 
-.original-link::before {
-  content: "📎 ";
+.reply-to a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.reply-to a:hover {
+  text-decoration: underline;
+}
+
+/* Original link to Telegram */
+.original-link a {
+  color: var(--gray-text);
+  text-decoration: none;
+}
+
+.original-link a:hover {
+  color: var(--accent-color);
+}
+
+.original-link .fa-telegram {
+  color: #0088cc;
+}
+
+/* Continuation links */
+.continuation {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  font-size: var(--font-small);
+}
+
+.continuation ul {
+  margin: 0.5rem 0 0 0;
+  padding-left: 1.5rem;
+}
+
+.continuation a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.continuation a:hover {
+  text-decoration: underline;
 }
