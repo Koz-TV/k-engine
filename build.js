@@ -1,11 +1,12 @@
 import fs from 'fs-extra';
 import path from 'path';
-import { 
-    config, 
-    isDev, 
-    shouldClean, 
-    forceRegenerate, 
-    assetManifest, 
+import frontMatter from 'front-matter';
+import {
+    config,
+    isDev,
+    shouldClean,
+    forceRegenerate,
+    assetManifest,
     subscribers,
     hashContent,
     shouldRegenerateFile,
@@ -28,27 +29,55 @@ const __dirname = dirname(__filename);
 fs.ensureDirSync(config.outputDir);
 
 // Helper to adjust paths for multi-language content
-// content/posts/en/slug/file -> docs/posts/slug/file (default lang, no prefix)
-// content/posts/ru/slug/file -> docs/ru/posts/slug/file (other lang, with prefix)
-function adjustPathForLanguage(relPath) {
+// New structure: {contentType}/{slug}/{lang}.md (for posts and projects)
+// Output:
+//   - Default lang: {contentType}/{slug}/index.md (will become {contentType}/{slug}/index.html)
+//   - Other lang:   {lang}/{contentType}/{slug}/index.md (will become {lang}/{contentType}/{slug}/index.html)
+// If frontmatter contains slug override, use it in output path
+function adjustPathForLanguage(relPath, srcFullPath = null) {
     const languages = config.languages || [];
     if (languages.length === 0) return relPath;
 
     const defaultLang = languages[0];
     const pathParts = relPath.split(path.sep);
 
-    // Pattern: posts/{lang}/slug/...
-    if (pathParts[0] === 'posts' && pathParts.length >= 3 && languages.includes(pathParts[1])) {
-        const lang = pathParts[1];
-        const rest = pathParts.slice(2); // slug and everything after
+    // Pattern: {contentType}/{folderSlug}/{lang}.md (for posts and projects)
+    const contentTypes = ['posts', 'projects'];
+    if (contentTypes.includes(pathParts[0]) && pathParts.length >= 3) {
+        const contentType = pathParts[0];
+        const folderSlug = pathParts[1];
+        const filename = pathParts[2];
 
-        if (lang === defaultLang) {
-            // Default language: posts/en/slug/file -> posts/slug/file
-            return path.join('posts', ...rest);
-        } else {
-            // Non-default language: posts/ru/slug/file -> ru/posts/slug/file
-            return path.join(lang, 'posts', ...rest);
+        // Check if this is a language .md file (e.g., en.md, ru.md)
+        if (filename.endsWith('.md')) {
+            const lang = filename.replace('.md', '');
+
+            if (languages.includes(lang)) {
+                // Read frontmatter to get slug override if available
+                let slug = folderSlug;
+                if (srcFullPath && fs.existsSync(srcFullPath)) {
+                    try {
+                        const content = fs.readFileSync(srcFullPath, 'utf-8');
+                        const { attributes } = frontMatter(content);
+                        if (attributes.slug) {
+                            slug = attributes.slug;
+                        }
+                    } catch { /* use default folderSlug */ }
+                }
+
+                if (lang === defaultLang) {
+                    // Default language: {contentType}/{slug}/{lang}.md -> {contentType}/{slug}/index.md
+                    return path.join(contentType, slug, 'index.md');
+                } else {
+                    // Other language: {contentType}/{slug}/{lang}.md -> {lang}/{contentType}/{slug}/index.md
+                    return path.join(lang, contentType, slug, 'index.md');
+                }
+            }
         }
+
+        // Handle other files in the folder (media, etc.)
+        // They go to {contentType}/{folderSlug}/
+        return relPath;
     }
 
     return relPath;
@@ -61,21 +90,13 @@ async function processDir(srcDir) {
         const fullPath = path.join(srcDir, entry.name);
         const relPath = path.relative(config.sourceDir, fullPath);
 
-        // Adjust path for multi-language content
-        const adjustedRelPath = adjustPathForLanguage(relPath);
+        // Adjust path for multi-language content (pass full path for frontmatter reading)
+        const adjustedRelPath = adjustPathForLanguage(relPath, fullPath);
         const destPath = path.join(config.outputDir, adjustedRelPath);
 
         if (entry.isDirectory()) {
-            // For language directories inside posts/, don't create them directly
-            // as their contents will be remapped
-            const languages = config.languages || [];
-            if (relPath.startsWith('posts' + path.sep) && languages.includes(entry.name)) {
-                // This is a language folder, process its contents but don't create the folder
-                await processDir(fullPath);
-            } else {
-                await fs.ensureDir(destPath);
-                await processDir(fullPath);
-            }
+            await fs.ensureDir(destPath);
+            await processDir(fullPath);
         } else if (entry.isFile()) {
             // Ensure destination directory exists
             await fs.ensureDir(path.dirname(destPath));

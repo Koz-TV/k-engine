@@ -769,7 +769,7 @@ body.home nav.narrow {
 .lang-switcher {
   font-size: var(--font-small);
   color: var(--gray-text);
-  margin-bottom: var(--gap);
+  margin-left: auto;
 }
 
 .lang-switcher .lang-current {
@@ -779,8 +779,5 @@ body.home nav.narrow {
 
 .lang-switcher .lang-link {
   color: var(--accent-color);
-}
-
-.lang-switcher .lang-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
