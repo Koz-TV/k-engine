@@ -27,20 +27,60 @@ const __dirname = dirname(__filename);
 // Создаем выходную директорию
 fs.ensureDirSync(config.outputDir);
 
+// Helper to adjust paths for multi-language content
+// content/posts/en/slug/file -> docs/posts/slug/file (default lang, no prefix)
+// content/posts/ru/slug/file -> docs/ru/posts/slug/file (other lang, with prefix)
+function adjustPathForLanguage(relPath) {
+    const languages = config.languages || [];
+    if (languages.length === 0) return relPath;
+
+    const defaultLang = languages[0];
+    const pathParts = relPath.split(path.sep);
+
+    // Pattern: posts/{lang}/slug/...
+    if (pathParts[0] === 'posts' && pathParts.length >= 3 && languages.includes(pathParts[1])) {
+        const lang = pathParts[1];
+        const rest = pathParts.slice(2); // slug and everything after
+
+        if (lang === defaultLang) {
+            // Default language: posts/en/slug/file -> posts/slug/file
+            return path.join('posts', ...rest);
+        } else {
+            // Non-default language: posts/ru/slug/file -> ru/posts/slug/file
+            return path.join(lang, 'posts', ...rest);
+        }
+    }
+
+    return relPath;
+}
+
 // Helper to walk source directory recursively
 async function processDir(srcDir) {
     const entries = await fs.readdir(srcDir, { withFileTypes: true });
     for (const entry of entries) {
         const fullPath = path.join(srcDir, entry.name);
         const relPath = path.relative(config.sourceDir, fullPath);
-        const destPath = path.join(config.outputDir, relPath);
+
+        // Adjust path for multi-language content
+        const adjustedRelPath = adjustPathForLanguage(relPath);
+        const destPath = path.join(config.outputDir, adjustedRelPath);
 
         if (entry.isDirectory()) {
-            await fs.ensureDir(destPath);
-            await processDir(fullPath);
+            // For language directories inside posts/, don't create them directly
+            // as their contents will be remapped
+            const languages = config.languages || [];
+            if (relPath.startsWith('posts' + path.sep) && languages.includes(entry.name)) {
+                // This is a language folder, process its contents but don't create the folder
+                await processDir(fullPath);
+            } else {
+                await fs.ensureDir(destPath);
+                await processDir(fullPath);
+            }
         } else if (entry.isFile()) {
+            // Ensure destination directory exists
+            await fs.ensureDir(path.dirname(destPath));
             // Отслеживаем обработанные файлы
-            await processContentFile(fullPath, destPath, relPath, entry, forceRegenerate, (filePath) => {
+            await processContentFile(fullPath, destPath, adjustedRelPath, entry, forceRegenerate, (filePath) => {
                 processedFiles.add(filePath);
             });
         }

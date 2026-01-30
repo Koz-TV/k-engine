@@ -764,3 +764,23 @@ body.home nav.narrow {
   display:inline-block;
   vertical-align: middle;
 }
+
+/* Language switcher */
+.lang-switcher {
+  font-size: var(--font-small);
+  color: var(--gray-text);
+  margin-bottom: var(--gap);
+}
+
+.lang-switcher .lang-current {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lang-switcher .lang-link {
+  color: var(--accent-color);
+}
+
+.lang-switcher .lang-link:hover {
+  text-decoration: underline;
+}
