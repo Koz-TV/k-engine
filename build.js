@@ -232,6 +232,84 @@ async function build() {
 
     // В конце очищаем файлы и папки, которые больше не должны существовать
     await cleanupRemovedFiles();
+
+    // Generate sitemap.xml and robots.txt
+    await generateSitemap();
+    await generateRobotsTxt();
+}
+
+// Generate sitemap.xml from all HTML files in output directory
+async function generateSitemap() {
+    const siteUrl = config.cname ? `https://${config.cname}` : 'http://localhost:3000';
+    const urls = [];
+
+    async function scanDir(dir, baseUrl = '') {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            const urlPath = baseUrl + '/' + entry.name;
+
+            if (entry.isDirectory()) {
+                // Skip hidden directories and static
+                if (entry.name.startsWith('.') || entry.name === 'static') continue;
+                await scanDir(fullPath, urlPath);
+            } else if (entry.name === 'index.html') {
+                // Get file modification time for lastmod
+                const stats = await fs.stat(fullPath);
+                const lastmod = stats.mtime.toISOString().split('T')[0];
+
+                // URL is the directory path (without index.html)
+                const url = baseUrl === '' ? '/' : baseUrl + '/';
+
+                // Determine priority based on path depth
+                const depth = url.split('/').filter(Boolean).length;
+                const priority = depth === 0 ? '1.0' : depth === 1 ? '0.8' : '0.6';
+
+                urls.push({ url, lastmod, priority });
+            }
+        }
+    }
+
+    await scanDir(config.outputDir);
+
+    // Sort URLs: homepage first, then alphabetically
+    urls.sort((a, b) => {
+        if (a.url === '/') return -1;
+        if (b.url === '/') return 1;
+        return a.url.localeCompare(b.url);
+    });
+
+    // Generate sitemap XML
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(({ url, lastmod, priority }) => `  <url>
+    <loc>${siteUrl}${url}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <priority>${priority}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+    const sitemapPath = path.join(config.outputDir, 'sitemap.xml');
+    await fs.writeFile(sitemapPath, sitemap);
+    processedFiles.add(sitemapPath);
+    console.log(`Generated sitemap.xml with ${urls.length} URLs`);
+}
+
+// Generate robots.txt with sitemap reference
+async function generateRobotsTxt() {
+    const siteUrl = config.cname ? `https://${config.cname}` : 'http://localhost:3000';
+
+    const robotsTxt = `User-agent: *
+Allow: /
+
+Sitemap: ${siteUrl}/sitemap.xml
+`;
+
+    const robotsPath = path.join(config.outputDir, 'robots.txt');
+    await fs.writeFile(robotsPath, robotsTxt);
+    processedFiles.add(robotsPath);
+    console.log('Generated robots.txt');
 }
 
 // Функция для наблюдения за изменениями
