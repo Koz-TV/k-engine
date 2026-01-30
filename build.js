@@ -34,9 +34,10 @@ fs.ensureDirSync(config.outputDir);
 //   - Default lang: {contentType}/{slug}/index.md (will become {contentType}/{slug}/index.html)
 //   - Other lang:   {lang}/{contentType}/{slug}/index.md (will become {lang}/{contentType}/{slug}/index.html)
 // If frontmatter contains slug override, use it in output path
+// Returns { adjustedPath, folderSlug } where folderSlug is the original folder name (for translation lookup)
 function adjustPathForLanguage(relPath, srcFullPath = null) {
     const languages = config.languages || [];
-    if (languages.length === 0) return relPath;
+    if (languages.length === 0) return { adjustedPath: relPath, folderSlug: null };
 
     const defaultLang = languages[0];
     const pathParts = relPath.split(path.sep);
@@ -45,7 +46,7 @@ function adjustPathForLanguage(relPath, srcFullPath = null) {
     const contentTypes = ['posts', 'projects'];
     if (contentTypes.includes(pathParts[0]) && pathParts.length >= 3) {
         const contentType = pathParts[0];
-        const folderSlug = pathParts[1];
+        const folderSlug = pathParts[1]; // Original folder name - needed for translation lookup
         const filename = pathParts[2];
 
         // Check if this is a language .md file (e.g., en.md, ru.md)
@@ -67,20 +68,20 @@ function adjustPathForLanguage(relPath, srcFullPath = null) {
 
                 if (lang === defaultLang) {
                     // Default language: {contentType}/{slug}/{lang}.md -> {contentType}/{slug}/index.md
-                    return path.join(contentType, slug, 'index.md');
+                    return { adjustedPath: path.join(contentType, slug, 'index.md'), folderSlug };
                 } else {
                     // Other language: {contentType}/{slug}/{lang}.md -> {lang}/{contentType}/{slug}/index.md
-                    return path.join(lang, contentType, slug, 'index.md');
+                    return { adjustedPath: path.join(lang, contentType, slug, 'index.md'), folderSlug };
                 }
             }
         }
 
         // Handle other files in the folder (media, etc.)
         // They go to {contentType}/{folderSlug}/
-        return relPath;
+        return { adjustedPath: relPath, folderSlug };
     }
 
-    return relPath;
+    return { adjustedPath: relPath, folderSlug: null };
 }
 
 // Helper to walk source directory recursively
@@ -91,7 +92,7 @@ async function processDir(srcDir) {
         const relPath = path.relative(config.sourceDir, fullPath);
 
         // Adjust path for multi-language content (pass full path for frontmatter reading)
-        const adjustedRelPath = adjustPathForLanguage(relPath, fullPath);
+        const { adjustedPath: adjustedRelPath, folderSlug } = adjustPathForLanguage(relPath, fullPath);
         const destPath = path.join(config.outputDir, adjustedRelPath);
 
         if (entry.isDirectory()) {
@@ -103,7 +104,7 @@ async function processDir(srcDir) {
             // Отслеживаем обработанные файлы
             await processContentFile(fullPath, destPath, adjustedRelPath, entry, forceRegenerate, (filePath) => {
                 processedFiles.add(filePath);
-            });
+            }, folderSlug);
         }
     }
 }
