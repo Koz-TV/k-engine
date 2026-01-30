@@ -30,13 +30,14 @@
 </head>
 <body class="{{bodyClass}}">
     {{> header}}
-    
+
     <main>
         <article>
-            
+            {{langSwitcher}}
             <div class="content">
                 <h1>{{title}}</h1>
                 <div class="date">{{date}}</div>
+                {{originalLink}}
                 {{content}}
             </div>
         </article>

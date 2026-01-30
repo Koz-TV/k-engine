@@ -781,3 +781,16 @@ body.home nav.narrow {
   color: var(--accent-color);
   text-decoration: none;
 }
+
+/* Original link (e.g., Telegram) */
+.original-link {
+  display: inline-block;
+  font-size: var(--font-small);
+  color: var(--accent-color);
+  text-decoration: none;
+  margin-bottom: 1rem;
+}
+
+.original-link::before {
+  content: "📎 ";
+}
