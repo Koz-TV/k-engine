@@ -1,6 +1,6 @@
 {
   "name": "k-engine",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Static-site engine powering KozTV projects",
   "type": "module",
   "bin": {
